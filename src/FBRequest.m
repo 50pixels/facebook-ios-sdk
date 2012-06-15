@@ -15,7 +15,7 @@
  */
 
 #import "FBRequest.h"
-#import "JSON.h"
+#import "SBJSON.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // global
@@ -202,7 +202,7 @@ static const NSTimeInterval kTimeoutInterval = 180.0;
     }
     
     
-    SBJSON *jsonParser = [[SBJSON alloc] init];
+    SBJsonParser *jsonParser = [[SBJsonParser alloc] init];
     id result = [jsonParser objectWithString:responseString];
     [jsonParser release];
 
@@ -254,6 +254,10 @@ static const NSTimeInterval kTimeoutInterval = 180.0;
     if ([_delegate respondsToSelector:@selector(request:didFailWithError:)]) {
         [_delegate request:self didFailWithError:error];
     }
+    if(_errorBlock)
+    {
+        _errorBlock(error);
+    }
 }
 
 /*
@@ -280,8 +284,22 @@ static const NSTimeInterval kTimeoutInterval = 180.0;
                 [_delegate request:self didLoad:result];
             }
             
+            
         }
     
+    
+    if(_completionBlock)
+    {
+        if([result isKindOfClass:[NSArray class]])
+        {
+            _completionBlock(result,nil);
+        }
+        else {
+            _completionBlock(nil,result);
+        }
+        
+    }
+
 }
 
 
@@ -304,7 +322,7 @@ static const NSTimeInterval kTimeoutInterval = 180.0;
     if ([_delegate respondsToSelector:@selector(requestLoading:)]) {
         [_delegate requestLoading:self];
     }
-    
+
     NSString* url = [[self class] serializeURL:_url params:_params httpMethod:_httpMethod];
     NSMutableURLRequest* request =
     [NSMutableURLRequest requestWithURL:[NSURL URLWithString:url]
@@ -345,7 +363,7 @@ static const NSTimeInterval kTimeoutInterval = 180.0;
 
 - (void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response {
     _responseText = [[NSMutableData alloc] init];
-    
+
     NSHTTPURLResponse* httpResponse = (NSHTTPURLResponse*)response;
     if ([_delegate respondsToSelector:
          @selector(request:didReceiveResponse:)]) {
@@ -376,6 +394,20 @@ static const NSTimeInterval kTimeoutInterval = 180.0;
     self.responseText = nil;
     self.connection = nil;
     self.state = kFBRequestStateComplete;
+}
+
+
+#pragma mark Blocks
+-(void)setCompletionBlock:(FBRequestCompletionBlock)aBlock
+{
+    [_completionBlock release];
+    _completionBlock = [aBlock copy];
+}
+
+-(void)setErrorBlock:(FBRequestErrorBlock)aBlock
+{
+    [_errorBlock release];
+    _errorBlock = [aBlock copy];
 }
 
 @end

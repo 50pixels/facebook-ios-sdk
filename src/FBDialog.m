@@ -18,7 +18,7 @@
 #import "FBDialog.h"
 #import "Facebook.h"
 #import "FBFrictionlessRequestSettings.h"
-#import "JSON.h"
+#import "SBJSON.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // global
@@ -409,10 +409,8 @@ params   = _params;
 
 // Display the dialog's WebView with a slick pop-up animation	
 - (void)showWebView {	
-    UIWindow* window = [UIApplication sharedApplication].keyWindow;	
-    if (!window) {	
-        window = [[UIApplication sharedApplication].windows objectAtIndex:0];	
-    }	
+    UIWindow* window = [[UIApplication sharedApplication].windows objectAtIndex:0];
+    
     _modalBackgroundView.frame = window.frame;	
     [_modalBackgroundView addSubview:self];	
     [window addSubview:_modalBackgroundView];	
@@ -500,12 +498,7 @@ params   = _params;
 
 - (void)webView:(UIWebView *)webView didFailLoadWithError:(NSError *)error {
     // 102 == WebKitErrorFrameLoadInterruptedByPolicyChange
-    // -999 == "Operation could not be completed", note -999 occurs when the user clicks away before
-    // the page has completely loaded, if we find cases where we want this to result in dialog failure
-    // (usually this just means quick-user), then we should add something more robust here to account
-    // for differences in application needs
-    if (!(([error.domain isEqualToString:@"NSURLErrorDomain"] && error.code == -999) ||
-          ([error.domain isEqualToString:@"WebKitErrorDomain"] && error.code == 102))) {
+    if (!([error.domain isEqualToString:@"WebKitErrorDomain"] && error.code == 102)) {
         [self dismissWithError:error animated:YES];
     }
 }

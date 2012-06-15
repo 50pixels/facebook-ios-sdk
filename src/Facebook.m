@@ -15,10 +15,9 @@
  */
 
 #import "Facebook.h"
-#import "FBFrictionlessRequestSettings.h"
 #import "FBLoginDialog.h"
 #import "FBRequest.h"
-#import "JSON.h"
+#import "SBJSON.h"
 
 static NSString* kDialogBaseURL = @"https://m.facebook.com/dialog/";
 static NSString* kGraphBaseURL = @"https://graph.facebook.com/";
@@ -117,8 +116,6 @@ static void *finishedContext = @"finishedContext";
  * Override NSObject : free the space
  */
 - (void)dealloc {
-    // this is the one case where the delegate is this object
-    _requestExtendingAccessToken.delegate = nil;
     for (FBRequest* _request in _requests) {
         [_request removeObserver:self forKeyPath:requestFinishedKeyPath];
     }
@@ -187,6 +184,36 @@ static void *finishedContext = @"finishedContext";
     [_request connect];
     return _request;
 }
+
+
+- (FBRequest*)openUrl:(NSString *)url
+               params:(NSMutableDictionary *)params
+           httpMethod:(NSString *)httpMethod
+      completionBlock:(FBRequestCompletionBlock)completionBlock
+           errorBlock:(FBRequestErrorBlock)errorBlock
+{
+
+    [params setValue:@"json" forKey:@"format"];
+    [params setValue:kSDK forKey:@"sdk"];
+    [params setValue:kSDKVersion forKey:@"sdk_version"];
+    if ([self isSessionValid]) {
+        [params setValue:self.accessToken forKey:@"access_token"];
+    }
+    
+    [self extendAccessTokenIfNeeded];
+    
+    FBRequest* _request = [FBRequest getRequestWithParams:params
+                                               httpMethod:httpMethod
+                                                 delegate:nil
+                                               requestURL:url];
+    [_request setCompletionBlock:completionBlock];
+    [_request setErrorBlock:errorBlock];
+    [_requests addObject:_request];
+    [_request addObserver:self forKeyPath:requestFinishedKeyPath options:0 context:finishedContext];
+    [_request connect];
+    return _request;
+}
+
 
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
     if (context == finishedContext) {
@@ -354,7 +381,7 @@ static void *finishedContext = @"finishedContext";
     NSMutableDictionary* params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
                                    @"auth.extendSSOAccessToken", @"method",
                                    nil];
-    _requestExtendingAccessToken = [self requestWithParams:params andDelegate:self];
+    [self requestWithParams:params andDelegate:self];
 }
 
 /**
@@ -585,6 +612,21 @@ static void *finishedContext = @"finishedContext";
                           andDelegate:delegate];
 }
 
+
+- (FBRequest*)requestWithGraphPath:(NSString *)graphPath
+                   completionBlock:(FBRequestCompletionBlock)completionBlock
+                        errorBlock:(FBRequestErrorBlock)errorBlock
+{
+    NSString * fullURL = [kGraphBaseURL stringByAppendingString:graphPath];
+
+    return [self openUrl:fullURL
+                  params:[NSMutableDictionary dictionary]
+              httpMethod:@"GET"
+         completionBlock:completionBlock
+              errorBlock:errorBlock];
+}
+
+
 /**
  * Make a request to the Facebook Graph API with the given string
  * parameters using an HTTP GET (default method).
@@ -697,7 +739,7 @@ static void *finishedContext = @"finishedContext";
     [params setObject:kSDKVersion forKey:@"sdk"];
     [params setObject:kRedirectURL forKey:@"redirect_uri"];
     
-    if ([action isEqualToString:kLogin]) {
+    if (action == kLogin) {
         [params setObject:@"user_agent" forKey:@"type"];
         _fbDialog = [[FBLoginDialog alloc] initWithURL:dialogURL loginParams:params delegate:self];
     } else {
@@ -712,7 +754,7 @@ static void *finishedContext = @"finishedContext";
         BOOL invisible = NO;
         
         // frictionless handling for application requests
-        if ([action isEqualToString:kApprequests]) {        
+        if (action == kApprequests) {        
             // if frictionless requests are enabled
             if (self.isFrictionlessRequestsEnabled) {
                 //  1. show the "Don't show this again for these friends" checkbox
@@ -807,12 +849,10 @@ static void *finishedContext = @"finishedContext";
 
 - (void)request:(FBRequest *)request didFailWithError:(NSError *)error {
     _isExtendingAccessToken = NO;
-    _requestExtendingAccessToken = nil;
 }
 
 - (void)request:(FBRequest *)request didLoad:(id)result {
     _isExtendingAccessToken = NO;
-    _requestExtendingAccessToken = nil;
     NSString* accessToken = [result objectForKey:@"access_token"];
     NSString* expTime = [result objectForKey:@"expires_at"];
     

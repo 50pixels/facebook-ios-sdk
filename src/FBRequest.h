@@ -27,6 +27,11 @@ enum {
 };
 typedef NSUInteger FBRequestState;
 
+
+//completion blocks
+typedef void(^FBRequestCompletionBlock)(NSArray *results,NSDictionary *result);
+typedef void(^FBRequestErrorBlock)(NSError *error);
+
 /**
  * Do not use this interface directly, instead, use method in Facebook.h
  */
@@ -40,6 +45,9 @@ typedef NSUInteger FBRequestState;
     FBRequestState        _state;
     NSError*              _error;
     BOOL                  _sessionDidExpire;
+    
+    FBRequestCompletionBlock _completionBlock;
+    FBRequestErrorBlock _errorBlock;
 }
 
 
@@ -87,6 +95,11 @@ typedef NSUInteger FBRequestState;
 - (BOOL) loading;
 
 - (void) connect;
+
+
+#pragma mark Blocks
+-(void)setCompletionBlock:(FBRequestCompletionBlock)aBlock;
+-(void)setErrorBlock:(FBRequestErrorBlock)aBlock;
 
 @end
 
